@@ -28,7 +28,7 @@ function CreateNew() {
     }
   };
 
-  const GetVideoScript = () => {
+  const GetVideoScript = async () => {
     setLoading(true);
     const prompt = `Create a ${formData.duration} video script about "${formData.topic}" in ${formData.imageStyle} style. 
     Return the response in this exact JSON format:
@@ -45,11 +45,9 @@ function CreateNew() {
     
     console.log("Sending prompt:", prompt);
 
-    axios.post("/api/get-video-script", {
-      prompt: prompt,
-    })
-    .then(response => {
-      console.log("Raw response:", response.data);
+    try {
+      const response = await axios.post("/api/get-video-script", { prompt });
+      console.log("Raw response:", response.data.result);
       
       if (response.data && response.data.result) {
         const parsedResult = response.data.result;
@@ -64,20 +62,17 @@ function CreateNew() {
       } else {
         throw new Error("Invalid response format");
       }
-    })
-    .catch(error => {
+    } catch (error) {
       console.error("Error:", error);
       alert("Failed to fetch video script. Please try again.");
-    })
-    .finally(() => {
+    } finally {
       setLoading(false);
-    });
+    }
   };
 
   const GenerateAudioFile = (scenes) => {
     try {
       let script = '';
-      const id = uuidv4()
       scenes.forEach((scene, index) => {
         if (scene.contentText) {
           script += `Scene ${index + 1}: ${scene.contentText} `;
@@ -107,25 +102,6 @@ function CreateNew() {
       </div>
 
       <CustomLoading loading={loading} />
-
-      {/* {videoScript && !loading && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-md">
-          <h3 className="text-xl font-semibold mb-4">Generated Script</h3>
-          <div className="space-y-4">
-            {videoScript.scenes?.map((scene, index) => (
-              <div key={index} className="border p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Scene {index + 1}</h4>
-                <p className="text-gray-700 mb-2">
-                  <strong>Content:</strong> {scene.contentText}
-                </p>
-                <p className="text-gray-700">
-                  <strong>Image Prompt:</strong> {scene.imagePrompt}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
     </div>
   );
 }
