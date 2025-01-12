@@ -17,19 +17,28 @@ function CreateNew() {
       ...prev,
       [fieldName]: fieldValue,
     }));
-    console.log(`Selected ${fieldName}:`, fieldValue); // Debug log
   };
 
-  const onCreateClickHandler = () => {
-    if (formData.topic && formData.duration && formData.imageStyle) {
-      GetVideoScript();
-    } else {
+  const onCreateClickHandler = async () => {
+    console.log("Create button clicked");
+    console.log("Current form data:", formData);
+    
+    if (!formData.topic || !formData.duration || !formData.imageStyle) {
       alert("Please fill in all fields.");
+      return;
     }
-  };
+
+    try {
+      console.log("Setting loading to true");
+      setLoading(true); // Set loading to true before API call
+      await GetVideoScript();
+    } catch (error) {
+      console.error("Error in create handler:", error);
+      alert("An error occurred while processing your request.");
+    }
+};
 
   const GetVideoScript = async () => {
-    setLoading(true);
     const prompt = `Create a ${formData.duration} video script about "${formData.topic}" in ${formData.imageStyle} style. 
     Return the response in this exact JSON format:
     {
@@ -43,45 +52,40 @@ function CreateNew() {
       ]
     }`;
     
-    console.log("Sending prompt:", prompt);
-
     try {
       const response = await axios.post("/api/get-video-script", { prompt });
-      console.log("Raw response:", response.data.result);
       
-      if (response.data && response.data.result) {
+      if (response.data?.result) {
         const parsedResult = response.data.result;
-        console.log("Parsed result:", parsedResult);
         setVideoScript(parsedResult);
         
         if (parsedResult.scenes && Array.isArray(parsedResult.scenes)) {
-          GenerateAudioFile(parsedResult.scenes);
+          await GenerateAudioFile(parsedResult.scenes);
         } else {
-          console.error("Invalid response format - missing scenes array");
+          throw new Error("Invalid response format - missing scenes array");
         }
       } else {
         throw new Error("Invalid response format");
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Failed to fetch video script. Please try again.");
+      throw error; // Propagate error to the handler
     } finally {
-      setLoading(false);
+      setLoading(false); // Set loading to false after all processing is done
     }
   };
 
-  const GenerateAudioFile = (scenes) => {
+  const GenerateAudioFile = async (scenes) => {
     try {
-      let script = '';
-      scenes.forEach((scene, index) => {
-        if (scene.contentText) {
-          script += `Scene ${index + 1}: ${scene.contentText} `;
-        }
-      });
+      let script = scenes.map((scene, index) => 
+        `Scene ${index + 1}: ${scene.contentText}`
+      ).join(' ');
+      
       console.log("Generated script:", script);
       return script;
     } catch (error) {
       console.error("Error generating audio script:", error);
+      throw error;
     }
   };
 
