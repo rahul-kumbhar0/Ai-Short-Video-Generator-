@@ -6,9 +6,14 @@ import SelectDuration from './_components/SelectDuration';
 import { Button } from "../../../@/components/ui/button";
 import axios from "axios";
 import CustomLoading from './_components/CustomLoading';
+import { v4 as uuidv4 } from 'uuid';
 
 function CreateNew() {
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({
+    topic: '',
+    duration: '',
+    imageStyle: ''
+  });
   const [loading, setLoading] = useState(false);
   const [videoScript, setVideoScript] = useState(null);
 
@@ -22,7 +27,7 @@ function CreateNew() {
   const onCreateClickHandler = async () => {
     console.log("Create button clicked");
     console.log("Current form data:", formData);
-    
+
     if (!formData.topic || !formData.duration || !formData.imageStyle) {
       alert("Please fill in all fields.");
       return;
@@ -30,37 +35,44 @@ function CreateNew() {
 
     try {
       console.log("Setting loading to true");
-      setLoading(true); // Set loading to true before API call
-      await GetVideoScript();
+      setLoading(true);
+      await getVideoScript();
     } catch (error) {
       console.error("Error in create handler:", error);
-      alert("An error occurred while processing your request.");
+      alert("An error occurred while processing your request. Please try again.");
+    } finally {
+      setLoading(false);
     }
-};
+  };
 
-  const GetVideoScript = async () => {
-    const prompt = `Create a ${formData.duration} video script about "${formData.topic}" in ${formData.imageStyle} style. 
-    Return the response in this exact JSON format:
-    {
-      "scenes": [
-        {
-          "sceneNumber": 1,
-          "imagePrompt": "Detailed image generation prompt",
-          "contentText": "Scene description and script",
-          "duration": "Duration in seconds"
-        }
-      ]
-    }`;
-    
+  const getVideoScript = async () => {
     try {
+      const prompt = `Create a ${formData.duration} video script about "${formData.topic}" in ${formData.imageStyle} style. 
+      Return the response in this exact JSON format:
+      {
+        "scenes": [
+          {
+            "sceneNumber": 1,
+            "imagePrompt": "Detailed image generation prompt",
+            "contentText": "Scene description and script",
+            "duration": "Duration in seconds"
+          }
+        ]
+      }`;
+
       const response = await axios.post("/api/get-video-script", { prompt });
-      
+
       if (response.data?.result) {
         const parsedResult = response.data.result;
         setVideoScript(parsedResult);
-        
+
+        // Extract all content texts from scenes
         if (parsedResult.scenes && Array.isArray(parsedResult.scenes)) {
-          await GenerateAudioFile(parsedResult.scenes);
+          const fullScript = parsedResult.scenes
+            .map(scene => scene.contentText)
+            .join(' ');
+          
+          await generateAudioFile(fullScript);
         } else {
           throw new Error("Invalid response format - missing scenes array");
         }
@@ -69,36 +81,39 @@ function CreateNew() {
       }
     } catch (error) {
       console.error("Error:", error);
-      throw error; // Propagate error to the handler
-    } finally {
-      setLoading(false); // Set loading to false after all processing is done
+      throw error;
     }
   };
 
-  const GenerateAudioFile = async (scenes) => {
+  const generateAudioFile = async (scriptText) => {
     try {
-      let script = scenes.map((scene, index) => 
-        `Scene ${index + 1}: ${scene.contentText}`
-      ).join(' ');
-      
-      console.log("Generated script:", script);
-      return script;
+      const id = uuidv4();
+      await axios.post('/api/generate-audio', {
+        text: scriptText,
+        id: id
+      }).then(resp => {
+        console.log('audio file generated successfully', resp.data);
+      });
     } catch (error) {
-      console.error("Error generating audio script:", error);
+      console.error("Error generating audio:", error);
       throw error;
     }
   };
 
   return (
     <div className="md:px-20">
-      <h2 className="font-bold mt-12 text-4xl text-primary text-center">Create New</h2>
+      <h2 className="font-bold mt-12 text-4xl text-primary text-center">
+        Create New
+      </h2>
+      
       <div className="mt-10 shadow-md p-10">
         <SelectTopic onUserSelect={onHandleInputChange} />
         <SelectStyle onUserSelect={onHandleInputChange} />
         <SelectDuration onUserSelect={onHandleInputChange} />
-        <Button
-          className="bg-[#8B3DFF] hover:bg-[#7c32eb] text-white font-semibold mt-10 w-full rounded-full transition-colors"
-          onClick={onCreateClickHandler}
+        
+        <Button 
+          className="bg-[#8B3DFF] hover:bg-[#7c32eb] text-white font-semibold mt-10 w-full rounded-full transition-colors" 
+          onClick={onCreateClickHandler} 
           disabled={loading}
         >
           {loading ? "Creating..." : "Create Short Video"}
@@ -106,6 +121,16 @@ function CreateNew() {
       </div>
 
       <CustomLoading loading={loading} />
+
+      {/* Optional: Display generated script for debugging */}
+      {videoScript && (
+        <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+          <h3 className="font-semibold mb-2">Generated Script:</h3>
+          <pre className="whitespace-pre-wrap">
+            {JSON.stringify(videoScript, null, 2)}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

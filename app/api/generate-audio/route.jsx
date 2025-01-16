@@ -1,17 +1,22 @@
-import { textToSpeech } from '@google-cloud/text-to-speech';
-import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
+// app/api/generate-audio/route.js
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import { NextResponse } from "next/server";
+const fs = require('fs');
+const util = require('util');
 
-const client = new textToSpeech.TextToSpeechClient({
+// Initialize the client with credentials
+const client = new TextToSpeechClient({
     apiKey: process.env.GOOGLE_API_KEY
 });
-export async function POST(req) {
 
+export async function POST(req) {
     const { text, id } = await req.json();
 
     const request = {
         input: { text: text },
-        voice: { languageCode: 'en-US', name: 'FEMALE' },
+        // Select the language and SSML voice gender (optional)
+        voice: { languageCode: 'en-US', ssmlGender: 'FEMALE' },
+        // select the type of audio encoding
         audioConfig: { audioEncoding: 'MP3' },
     };
 
@@ -22,5 +27,5 @@ export async function POST(req) {
     await writeFile('output.mp3', response.audioContent, 'binary');
     console.log('Audio content written to file: output.mp3');
 
-    return NextResponse.json({ Result: Success });
+    return NextResponse.json({ Result: 'Success' });
 }
